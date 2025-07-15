@@ -44,23 +44,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.xmbest.broadcastmonitor.constants.AppConstants
 import com.xmbest.broadcastmonitor.data.BroadcastData
 import com.xmbest.broadcastmonitor.data.BroadcastDataManager
 import com.xmbest.broadcastmonitor.ui.theme.BroadcastMonitorTheme
 import androidx.core.net.toUri
 
+/**
+ * Main Activity
+ */
 class MainActivity : ComponentActivity() {
 
-    companion object{
-        private const val TAG = "MainActivity"
+    companion object {
+        private const val TAG = AppConstants.Log.TAG_MAIN_ACTIVITY
+        const val TEST_BROADCAST_ACTION = "com.xmbest.broadcastmonitor.TEST_BROADCAST"
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            // 权限已获取
-            Log.d(TAG,"isGranted")
+            // Permission granted
+            Log.d(TAG, "isGranted")
         }
     }
 
@@ -69,8 +74,8 @@ class MainActivity : ComponentActivity() {
     ) { result ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (Environment.isExternalStorageManager()) {
-                // 已获取完整存储权限
-                Log.d(TAG,"isExternalStorageManager")
+                // Full storage permission granted
+                Log.d(TAG, "isExternalStorageManager")
             }
         }
     }
@@ -78,7 +83,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 请求存储权限
+        // Request storage permission
         requestStoragePermission()
 
         enableEdgeToEdge()
@@ -95,14 +100,14 @@ class MainActivity : ComponentActivity() {
 
     private fun requestStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ 需要特殊权限
+            // Android 11+ requires special permission
             if (!Environment.isExternalStorageManager()) {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                 intent.data = "package:$packageName".toUri()
                 requestManageStorageLauncher.launch(intent)
             }
         } else {
-            // Android 10及以下使用传统权限
+            // Android 10 and below use traditional permissions
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -123,65 +128,79 @@ fun BroadcastMonitorScreen(modifier: Modifier = Modifier) {
     val broadcastList by BroadcastDataManager.broadcastFlow
         .collectAsState(initial = emptyList())
 
+    /**
+     * Send test broadcast
+     */
+    fun sendTestBroadcast(context: android.content.Context) {
+        try {
+            val intent = Intent(MainActivity.TEST_BROADCAST_ACTION).apply {
+                putExtra("test_key", "test_value")
+                putExtra("timestamp", System.currentTimeMillis())
+                putExtra("test_message", "This is a test broadcast message")
+                putExtra("sender", "BroadcastMonitor")
+            }
+            context.sendBroadcast(intent)
+            Log.d(AppConstants.Log.TAG_MAIN_ACTIVITY, "Test broadcast sent: ${MainActivity.TEST_BROADCAST_ACTION}")
+        } catch (e: Exception) {
+            Log.e(AppConstants.Log.TAG_MAIN_ACTIVITY, "Failed to send test broadcast: ${e.message}")
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // 标题
+        // Title
         Text(
-            text = "广播监控",
+            text = "Broadcast Monitor",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // 状态信息
+        // Status information
         Text(
-            text = "已捕获 ${broadcastList.size} 条广播",
+            text = "Captured ${broadcastList.size} broadcasts",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // 操作按钮行
+        // Action button row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 发送测试广播按钮
+            // Send test broadcast button
             Button(
                 onClick = {
-                    val intent = Intent("com.xmbest.broadcastmonitor.TEST_BROADCAST")
-                    intent.putExtra("test_key", "test_value")
-                    intent.putExtra("timestamp", System.currentTimeMillis())
-                    context.sendBroadcast(intent)
-
+                    sendTestBroadcast(context)
                 },
                 modifier = Modifier.weight(1f)
             ) {
-                Text("发送测试广播")
+                Text("Test Broadcast")
             }
 
-            // 清空按钮
+            // Clear button
             OutlinedButton(
                 onClick = {
                     BroadcastDataManager.clearBroadcasts()
                 },
                 modifier = Modifier.weight(1f)
             ) {
-                Text("清空记录")
+                Text("Clear Records")
             }
         }
 
-        // 广播列表
+        // Broadcast list
         Card(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(8.dp)
         ) {
             if (broadcastList.isEmpty()) {
-                // 空状态
+                // Empty state
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -192,14 +211,14 @@ fun BroadcastMonitorScreen(modifier: Modifier = Modifier) {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "暂无广播记录",
+                            text = "No broadcast records",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "点击\"发送测试广播\"来测试Hook功能\n\n" +
-                                    "注意：需要在LSPosed中激活此模块并重启系统框架后才能监控广播",
+                            text = "Click \"Send Test Broadcast\" to test Hook functionality\n\n" +
+                        "Note: You need to activate this module in LSPosed and restart the system framework to monitor broadcasts",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -207,7 +226,7 @@ fun BroadcastMonitorScreen(modifier: Modifier = Modifier) {
                     }
                 }
             } else {
-                // 广播列表
+                // Broadcast list
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
@@ -234,7 +253,7 @@ fun BroadcastItem(broadcast: BroadcastData) {
         Column(
             modifier = Modifier.padding(12.dp)
         ) {
-            // 标题行
+            // Title row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -248,7 +267,7 @@ fun BroadcastItem(broadcast: BroadcastData) {
                     modifier = Modifier.weight(1f)
                 )
 
-                // 优先级标记
+                // Priority indicator
                 Surface(
                     color = when (broadcast.priority) {
                         1 -> MaterialTheme.colorScheme.error
@@ -269,18 +288,18 @@ fun BroadcastItem(broadcast: BroadcastData) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 时间和来源
+            // Time and source
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "时间: ${broadcast.timestamp}",
+                    text = "Time: ${broadcast.timestamp}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
-                    text = "来源: ${broadcast.source}",
+                    text = "Source: ${broadcast.source}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -288,28 +307,28 @@ fun BroadcastItem(broadcast: BroadcastData) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 包名和分类
+            // Package name and category
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "包名: ${broadcast.packageName}",
+                    text = "Package: ${broadcast.packageName}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
-                    text = "分类: ${broadcast.category}",
+                    text = "Category: ${broadcast.category}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // 附加数据（如果有）
-            if (broadcast.extras.isNotEmpty() && broadcast.extras != "无Extras") {
+            // Additional data (if any)
+            if (broadcast.extras.isNotEmpty() && broadcast.extras != "No Extras") {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "附加数据: ${broadcast.extras}",
+                    text = "Extras: ${broadcast.extras}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2

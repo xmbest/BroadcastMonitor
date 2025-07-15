@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import com.highcapable.yukihookapi.hook.factory.method
 import com.highcapable.yukihookapi.hook.param.PackageParam
+import com.xmbest.broadcastmonitor.constants.AppConstants
 import com.xmbest.broadcastmonitor.utils.BroadcastFilter
 import com.xmbest.broadcastmonitor.utils.BroadcastLogger
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -13,23 +14,14 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 广播监听Hook实现
- * 负责拦截系统和应用进程的广播发送
+ * Broadcast Hook class
+ * Responsible for hooking system and application broadcast sending methods
  */
 class BroadcastHook(private val packageParam: PackageParam) {
 
     /**
-     * 启动所有Hook
-     */
-    fun hook() {
-        BroadcastLogger.logD("BroadcastHook initialization started")
-        hookSystemBroadcast()
-        hookUserBroadcast()
-    }
-
-    /**
-     * Hook系统级广播
-     * 监听ActivityManagerService.broadcastIntentLocked
+     * Hook system-level broadcasts
+     * Monitor ActivityManagerService.broadcastIntentLocked
      */
     fun hookSystemBroadcast() {
         BroadcastLogger.logD("Setting up system broadcast hooks...")
@@ -50,8 +42,8 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook用户级广播
-     * 监听Context相关的广播发送方法
+     * Hook user-level broadcasts
+     * Monitor Context-related broadcast sending methods
      */
     fun hookUserBroadcast() {
         BroadcastLogger.logD("Setting up user broadcast hooks...")
@@ -67,7 +59,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook ContextImpl 的广播方法
+     * Hook ContextImpl broadcast methods
      */
     private fun hookContextImpl() {
         val className = "android.app.ContextImpl"
@@ -83,7 +75,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook ContextWrapper 的广播方法
+     * Hook ContextWrapper broadcast methods
      */
     private fun hookContextWrapper() {
         val className = "android.content.ContextWrapper"
@@ -91,7 +83,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook ActivityManagerProxy 的广播方法
+     * Hook ActivityManagerProxy broadcast methods
      */
     private fun hookActivityManagerProxy() {
         try {
@@ -115,7 +107,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook sendBroadcast 方法
+     * Hook sendBroadcast method
      */
     private fun hookSendBroadcast(className: String, source: String) {
         try {
@@ -136,7 +128,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook sendStickyBroadcast 方法
+     * Hook sendStickyBroadcast method
      */
     private fun hookSendStickyBroadcast(className: String, source: String) {
         try {
@@ -157,7 +149,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * Hook sendOrderedBroadcast 方法
+     * Hook sendOrderedBroadcast method
      */
     private fun hookSendOrderedBroadcast(className: String, source: String) {
         // Hook sendOrderedBroadcast(Intent, String)
@@ -196,14 +188,14 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * 处理广播Intent
+     * Handle broadcast Intent
      */
     private fun handleBroadcastIntent(context: Context?, args: Array<Any?>, source: String) {
         try {
             val intentIndex = args.indexOfFirst { it is Intent }
             if (intentIndex >= 0) {
                 val intent = args[intentIndex] as Intent
-                processIntent(context,intent, source)
+                processIntent(context, intent, source)
             }
         } catch (e: Exception) {
             BroadcastLogger.logError("Handle broadcast intent error: ${e.message}")
@@ -211,13 +203,13 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * 处理Intent数据
+     * Process Intent data
      */
     private fun processIntent(context: Context?, intent: Intent, source: String) {
         try {
             val intentData = extractIntentData(intent)
             if (shouldLogBroadcast(intentData)) {
-                logBroadcast(context,intentData, source)
+                logBroadcast(context, intentData, source)
             } else {
                 BroadcastLogger.logD("Broadcast filtered out by BroadcastFilter")
             }
@@ -227,24 +219,22 @@ class BroadcastHook(private val packageParam: PackageParam) {
     }
 
     /**
-     * 判断是否应该记录广播
+     * Determine whether the broadcast should be logged
      */
     private fun shouldLogBroadcast(intentData: IntentData): Boolean {
-        // 过滤掉自己发送的数据传输广播
-        if (intentData.action == BroadcastLogger.BROADCAST_DATA_ACTION) {
+        // Filter out data transmission broadcasts sent by ourselves to avoid circular logging
+        if (intentData.action == AppConstants.Broadcast.DATA_ACTION) {
             return false
         }
         return BroadcastFilter.shouldLog(intentData.action, intentData.packageName)
     }
 
     /**
-     * 记录广播
+     * Log broadcast
      */
     @OptIn(DelicateCoroutinesApi::class)
     private fun logBroadcast(context: Context?, intentData: IntentData, source: String) {
         val timestamp = getCurrentTimestamp()
-        val category = BroadcastFilter.categorize(intentData.action)
-        val priority = BroadcastFilter.getPriority(intentData.action)
 
         BroadcastLogger.logBroadcast(
             context,
@@ -256,34 +246,32 @@ class BroadcastHook(private val packageParam: PackageParam) {
             type = intentData.type,
             component = intentData.component,
             flags = intentData.flags,
-            packageName = intentData.packageName,
-            category = category,
-            priority = priority
+            packageName = intentData.packageName
         )
     }
 }
 
 /**
- * 提取Intent数据
+ * Extract Intent data
  */
 private fun extractIntentData(intent: Intent): IntentData {
     return IntentData(
-        action = intent.action ?: "无Action",
-        packageName = intent.`package` ?: "无Package",
+        action = intent.action ?: "No Action",
+        packageName = intent.`package` ?: "No Package",
         extras = extractExtras(intent.extras),
-        categories = intent.categories?.joinToString(", ") ?: "无Category",
-        data = intent.dataString ?: "无Data",
-        type = intent.type ?: "无Type",
-        component = intent.component?.flattenToString() ?: "无Component",
+        categories = intent.categories?.joinToString(", ") ?: "No Category",
+        data = intent.dataString ?: "No Data",
+        type = intent.type ?: "No Type",
+        component = intent.component?.flattenToString() ?: "No Component",
         flags = intent.flags.toString()
     )
 }
 
 /**
- * 提取Bundle数据
+ * Extract Bundle data
  */
 private fun extractExtras(extras: Bundle?): String {
-    if (extras == null || extras.isEmpty) return "无Extras"
+    if (extras == null || extras.isEmpty) return "No Extras"
 
     return buildString {
         for (key in extras.keySet()) {
@@ -294,14 +282,14 @@ private fun extractExtras(extras: Bundle?): String {
                 }
                 appendLine("$key: ${value?.toString() ?: "null"}")
             } catch (e: Exception) {
-                appendLine("$key: [读取失败: ${e.message}]")
+                appendLine("$key: [Read failed: ${e.message}]")
             }
         }
     }.trim()
 }
 
 /**
- * 获取当前时间戳
+ * Get current timestamp
  */
 private fun getCurrentTimestamp(): String {
     return SimpleDateFormat(
@@ -311,7 +299,7 @@ private fun getCurrentTimestamp(): String {
 }
 
 /**
- * Intent数据模型
+ * Intent data model
  */
 private data class IntentData(
     val action: String,

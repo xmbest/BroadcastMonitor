@@ -1,55 +1,54 @@
 package com.xmbest.broadcastmonitor.data
 
+import android.annotation.SuppressLint
+import com.xmbest.broadcastmonitor.constants.AppConstants
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * 广播数据管理器
- * 负责管理广播数据流和存储
+ * Broadcast data manager
+ * Responsible for managing broadcast data flow and storage
  */
 object BroadcastDataManager {
 
     private const val TAG = "BroadcastDataManager"
 
-    val coroutineScope = CoroutineScope(Dispatchers.Main + CoroutineName(TAG))
+    val coroutineScope = CoroutineScope(Dispatchers.Default + CoroutineName(TAG))
 
-    // 广播数据流
-    private val _broadcastFlow = MutableSharedFlow<List<BroadcastData>>(
-        replay = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val broadcastFlow = _broadcastFlow.asSharedFlow()
+    // Broadcast data flow
+    private val _broadcastFlow = MutableStateFlow<List<BroadcastData>>(emptyList())
+    val broadcastFlow = _broadcastFlow.asStateFlow()
 
-    // 广播数据列表
-    private val _broadcastList = mutableListOf<BroadcastData>()
+    // Broadcast data list - using thread-safe queue
+    private val _broadcastList = ConcurrentLinkedQueue<BroadcastData>()
 
     /**
-     * 添加广播数据
+     * Add broadcast data
      */
     fun addBroadcast(broadcastData: BroadcastData) {
-        _broadcastList.add(0, broadcastData) // 添加到列表顶部
+        _broadcastList.offer(broadcastData) // Add to queue
 
-        // 限制列表大小，避免内存过多占用
-        if (_broadcastList.size > 1000) {
-            _broadcastList.removeAt(_broadcastList.size - 1)
+        // Limit list size to avoid excessive memory usage
+        while (_broadcastList.size > AppConstants.MAX_BROADCAST_LIST_SIZE) {
+            _broadcastList.poll()
         }
-        val list = _broadcastList.toList()
-        // 发送整个列表到Flow
+        val list = _broadcastList.toList().reversed() // Reverse to show newest first
+        // Send entire list to Flow
         coroutineScope.launch {
             _broadcastFlow.emit(list)
         }
     }
 
     /**
-     * 清空广播数据
+     * Clear broadcast data
      */
     fun clearBroadcasts() {
         _broadcastList.clear()
@@ -59,15 +58,41 @@ object BroadcastDataManager {
     }
 
     /**
-     * 获取格式化的时间戳
+     * Get current broadcast data list
+     */
+    fun getBroadcastList(): List<BroadcastData> {
+        return _broadcastList.toList().reversed() // Newest first
+    }
+
+    /**
+     * Get broadcast data count
+     */
+    fun getBroadcastCount(): Int {
+        return _broadcastList.size
+    }
+
+    /**
+     * Get current timestamp
+     * Optimization: Use thread-safe formatter
      */
     fun getCurrentTimestamp(): String {
-        return SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+        return synchronized(dateFormatter) {
+            dateFormatter.format(Date())
+        }
     }
+
+    /**
+     * Thread-safe date formatter
+     */
+    @SuppressLint("ConstantLocale")
+    private val dateFormatter = SimpleDateFormat(
+        AppConstants.File.DATE_FORMAT_PATTERN,
+        Locale.getDefault()
+    )
 }
 
 /**
- * 广播数据模型
+ * Broadcast data model
  */
 data class BroadcastData(
     val timestamp: String,
@@ -79,22 +104,22 @@ data class BroadcastData(
     val priority: Int
 ) {
     /**
-     * 获取显示标题
+     * Get display title
      */
     fun getDisplayTitle(): String {
         return "[$timestamp] $action"
     }
 
     /**
-     * 获取显示详情
+     * Get display details
      */
     fun getDisplayDetails(): String {
         return buildString {
-            appendLine("来源: $source")
-            appendLine("包名: $packageName")
-            appendLine("分类: $category")
-            if (extras.isNotEmpty() && extras != "无Extras") {
-                appendLine("附加数据:")
+            appendLine("Source: $source")
+            appendLine("Package: $packageName")
+            appendLine("Category: $category")
+            if (extras.isNotEmpty() && extras != "No Extras") {
+                appendLine("Extras:")
                 appendLine(extras)
             }
         }.trim()

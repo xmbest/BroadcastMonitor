@@ -62,6 +62,11 @@
         <meta-data
             android:name="xposedsharedprefs"
             android:value="true"/>
+
+        <!-- 模块作用域 -->
+        <meta-data
+            android:name="xposedscope"
+            android:resource="@array/xposedscope"/>
     </application>
 
 </manifest>

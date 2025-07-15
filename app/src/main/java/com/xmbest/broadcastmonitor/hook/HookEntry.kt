@@ -14,12 +14,12 @@ object HookEntry : IYukiHookXposedInit {
     }
 
     override fun onHook() = encase {
-        // Hook 系统进程 - 捕获系统级广播
+        // Hook system process - capture system-level broadcasts
         loadSystem {
             BroadcastHook(this).hookSystemBroadcast()
         }
         
-        // Hook 应用进程 - 捕获第三方应用广播 - 只会处理LSPosed中勾选的应用
+        // Hook application process - capture third-party app broadcasts - only processes apps checked in LSPosed
         loadApp {
             BroadcastHook(this).hookUserBroadcast()
         }
