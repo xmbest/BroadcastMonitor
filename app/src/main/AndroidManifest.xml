@@ -33,6 +33,16 @@
             </intent-filter>
         </activity>
 
+        <!-- 广播数据接收器 -->
+        <receiver
+            android:name=".receiver.BroadcastDataReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xmbest.broadcastmonitor.BROADCAST_DATA" />
+            </intent-filter>
+        </receiver>
+
         <!-- 设置为 Xposed 模块 -->
         <meta-data
             android:name="xposedmodule"

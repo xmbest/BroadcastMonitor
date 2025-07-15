@@ -1,5 +1,6 @@
 package com.xmbest.broadcastmonitor.hook
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import com.highcapable.yukihookapi.hook.factory.method
@@ -38,7 +39,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
                     name = "broadcastIntentLocked"
                 }.hook {
                     before {
-                        handleBroadcastIntent(args, "System-AMS")
+                        handleBroadcastIntent(packageParam.appContext, args, "System-AMS")
                     }
                 }.ignoredAllFailure()
                 BroadcastLogger.logD("ActivityManagerService hook setup completed")
@@ -99,7 +100,11 @@ class BroadcastHook(private val packageParam: PackageParam) {
                     name = "broadcastIntent"
                 }.hook {
                     before {
-                        handleBroadcastIntent(args, "ActivityManagerProxy-broadcastIntent")
+                        handleBroadcastIntent(
+                            packageParam.appContext,
+                            args,
+                            "ActivityManagerProxy-broadcastIntent"
+                        )
                     }
                 }.ignoredAllFailure()
                 BroadcastLogger.logD("ActivityManagerProxy hook setup completed")
@@ -120,7 +125,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
                     paramCount = 1
                 }.hook {
                     before {
-                        handleBroadcastIntent(args, source)
+                        handleBroadcastIntent(packageParam.appContext, args, source)
                     }
                 }.ignoredAllFailure()
                 BroadcastLogger.logD("$source hook setup completed")
@@ -141,7 +146,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
                     paramCount = 1
                 }.hook {
                     before {
-                        handleBroadcastIntent(args, source)
+                        handleBroadcastIntent(packageParam.appContext, args, source)
                     }
                 }.ignoredAllFailure()
                 BroadcastLogger.logD("$source hook setup completed")
@@ -163,7 +168,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
                     paramCount = 2
                 }.hook {
                     before {
-                        handleBroadcastIntent(args, "$source-2")
+                        handleBroadcastIntent(packageParam.appContext, args, "$source-2")
                     }
                 }.ignoredAllFailure()
                 BroadcastLogger.logD("$source-2 hook setup completed")
@@ -180,7 +185,7 @@ class BroadcastHook(private val packageParam: PackageParam) {
                     paramCount = 7
                 }.hook {
                     before {
-                        handleBroadcastIntent(args, "$source-7")
+                        handleBroadcastIntent(packageParam.appContext, args, "$source-7")
                     }
                 }.ignoredAllFailure()
                 BroadcastLogger.logD("$source-7 hook setup completed")
@@ -193,12 +198,12 @@ class BroadcastHook(private val packageParam: PackageParam) {
     /**
      * 处理广播Intent
      */
-    private fun handleBroadcastIntent(args: Array<Any?>, source: String) {
+    private fun handleBroadcastIntent(context: Context?, args: Array<Any?>, source: String) {
         try {
             val intentIndex = args.indexOfFirst { it is Intent }
             if (intentIndex >= 0) {
                 val intent = args[intentIndex] as Intent
-                processIntent(intent, source)
+                processIntent(context,intent, source)
             }
         } catch (e: Exception) {
             BroadcastLogger.logError("Handle broadcast intent error: ${e.message}")
@@ -208,11 +213,11 @@ class BroadcastHook(private val packageParam: PackageParam) {
     /**
      * 处理Intent数据
      */
-    private fun processIntent(intent: Intent, source: String) {
+    private fun processIntent(context: Context?, intent: Intent, source: String) {
         try {
             val intentData = extractIntentData(intent)
             if (shouldLogBroadcast(intentData)) {
-                logBroadcast(intentData, source)
+                logBroadcast(context,intentData, source)
             } else {
                 BroadcastLogger.logD("Broadcast filtered out by BroadcastFilter")
             }
@@ -225,6 +230,10 @@ class BroadcastHook(private val packageParam: PackageParam) {
      * 判断是否应该记录广播
      */
     private fun shouldLogBroadcast(intentData: IntentData): Boolean {
+        // 过滤掉自己发送的数据传输广播
+        if (intentData.action == BroadcastLogger.BROADCAST_DATA_ACTION) {
+            return false
+        }
         return BroadcastFilter.shouldLog(intentData.action, intentData.packageName)
     }
 
@@ -232,12 +241,13 @@ class BroadcastHook(private val packageParam: PackageParam) {
      * 记录广播
      */
     @OptIn(DelicateCoroutinesApi::class)
-    private fun logBroadcast(intentData: IntentData, source: String) {
+    private fun logBroadcast(context: Context?, intentData: IntentData, source: String) {
         val timestamp = getCurrentTimestamp()
         val category = BroadcastFilter.categorize(intentData.action)
         val priority = BroadcastFilter.getPriority(intentData.action)
 
         BroadcastLogger.logBroadcast(
+            context,
             timestamp = timestamp,
             action = "[$source] ${intentData.action}",
             extras = intentData.extras,
