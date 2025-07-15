@@ -217,7 +217,7 @@ fun BroadcastMonitorScreen(modifier: Modifier = Modifier) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Click \"Send Test Broadcast\" to test Hook functionality\n\n" +
+                            text = "Click \"Test Broadcast\" to test Hook functionality\n\n" +
                         "Note: You need to activate this module in LSPosed and restart the system framework to monitor broadcasts",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
